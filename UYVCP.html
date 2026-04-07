@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>多読・多聴 進捗ダッシュボード</title>
+  <style>
+    :root{
+      --bg:#0f1117;
+      --card:#1e2235;
+      --text:#e8ecf4;
+      --muted:rgba(232,236,244,0.45);
+      --accent:#4f8ef7;
+      --radius:10px;
+      --gap:12px;
+      font-family: system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    html,body{height:100%;}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      line-height:1.5;
+      padding:16px;
+    }
+    header{ display:flex; flex-direction:column; gap:12px; margin-bottom:12px; }
+    .top{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+    .meta{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .school{ font-size:14px; color:var(--muted); }
+    .teacher{ font-size:14px; color:var(--muted); }
+    .summary{
+      background:var(--card);
+      border-radius:var(--radius);
+      padding:12px;
+      box-shadow:0 6px 18px rgba(0,0,0,0.6);
+      min-width:260px;
+      width:100%;
+      max-width:520px;
+    }
+    .goal-main{ font-size:16px; font-weight:800; color:var(--text); margin-bottom:6px; word-break:break-word; }
+    .goal-sub{ font-size:13px; color:var(--muted); margin-bottom:8px; }
+    .progress-wrap{
+      background:rgba(255,255,255,0.04);
+      border-radius:999px;
+      height:18px;
+      overflow:hidden;
+    }
+    .progress-bar{
+      height:100%;
+      background:linear-gradient(90deg,#34d399,#4f8ef7);
+      width:0%;
+      transition:width 700ms ease;
+    }
+    .chart-card{
+      background:var(--card);
+      border-radius:var(--radius);
+      padding:12px;
+      box-shadow:0 6px 18px rgba(0,0,0,0.35);
+    }
+    main{ margin-top:12px; }
+    details{
+      background:var(--card);
+      border-radius:10px;
+      padding:10px;
+      margin-bottom:12px;
+      border:1px solid rgba(255,255,255,0.03);
+    }
+    summary{
+      list-style:none;
+      cursor:pointer;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      padding:6px 4px;
+      outline:none;
+    }
+    summary::-webkit-details-marker{ display:none; }
+    .summary-left{ display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
+    .week-title{ font-size:15px; font-weight:800; }
+    .week-range{ font-size:13px; color:var(--muted); margin-left:6px; }
+    .week-total{ font-size:13px; color:var(--muted); }
+    .details-content{ margin-top:8px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.03); display:block; }
+    .task-list{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+    .task-item{
+      background:rgba(255,255,255,0.02);
+      padding:8px 10px;
+      border-radius:8px;
+      min-width:180px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:8px;
+      font-size:13px;
+    }
+    .task-name{ display:flex; gap:8px; align-items:center; color:var(--text); }
+    .task-dot{ width:10px; height:10px; border-radius:50%; flex:0 0 10px; }
+    .task-done{ color:#bff7d9; font-weight:700; }
+    .task-not{ color:var(--muted); }
+    .daily-list{ margin-top:10px; }
+    .day-block{ margin-top:8px; }
+    .day-title{ font-size:13px; color:var(--muted); margin-bottom:6px; }
+    ul.log{ margin:0; padding-left:18px; list-style:disc; }
+    li.log-item{ margin-bottom:6px; font-size:13px; }
+    .done-strong{ color:var(--text); font-weight:700; }
+    .not-muted{ color:var(--muted); }
+    footer{ margin-top:18px; color:var(--muted); font-size:13px; }
+    /* summary hover/focus */
+    summary:hover, summary:focus{ background:rgba(255,255,255,0.02); border-radius:8px; }
+    @media(min-width:900px){
+      .top{ align-items:center; }
+      .summary{ width:auto; }
+      .chart-card{ width:60%; }
+    }
+  </style>
+
+  <script>
+var STUDENT_DATA = {
+  "山本唯菜": {
+    startDate: "2026-04-04",
+    totalWords: 8200,
+    achievementRate: 0.82,
+    records: [
+      { week: "2026-W14", weekRange: "3/30〜4/5", tasks: { "VOA": { words: 1200, count: 1, done: true }, "Science News": { words: 0, count: 0, done: false }, "TED": { words: 0, count: 0, done: false }, "ESL Lab": { words: 200, count: 1, done: true }, "Elllo": { words: 0, count: 0, done: false }, "リスニング基礎トレ": { words: 0, count: 0, done: false }, "Quizlet（指定単語帳）": { words: 0, count: 0, done: false }, "Quizlet（英熟語 Target1000）": { words: 0, count: 0, done: false }, "Quizlet（多義語）": { words: 0, count: 0, done: false }, "Quizlet（基本動詞）": { words: 0, count: 0, done: false }, "Quizlet（語法）": { words: 0, count: 0, done: false }, "Quizlet（論理マーカー）": { words: 0, count: 0, done: false }, "シス単例文付きチェックリスト": { words: 2000, count: 1, done: true }, "文法プリント": { words: 700, count: 1, done: true } }, total: 4100, dailyLogs: [{ date: "2026-04-04", logs: [{ task: "VOA", display: "VOA", words: 1200, done: true }, { task: "Science News", display: "Science News", words: 0, done: false }, { task: "TED", display: "TED", words: 0, done: false }, { task: "ESL Lab", display: "ESL Lab", words: 200, done: true }, { task: "Elllo", display: "Elllo", words: 0, done: false }, { task: "リスニング基礎トレ", display: "リスニング基礎トレ", words: 0, done: false }, { task: "Quizlet（指定単語帳）", display: "Quizlet（指定単語帳）", words: 0, done: false }, { task: "Quizlet（英熟語 Target1000）", display: "Quizlet（英熟語 Target1000）", words: 0, done: false }, { task: "Quizlet（多義語）", display: "Quizlet（多義語）", words: 0, done: false }, { task: "Quizlet（基本動詞）", display: "Quizlet（基本動詞）", words: 0, done: false }, { task: "Quizlet（語法）", display: "Quizlet（語法）", words: 0, done: false }, { task: "Quizlet（論理マーカー）", display: "Quizlet（論理マーカー）", words: 0, done: false }, { task: "シス単例文付きチェックリスト", display: "シス単例文付きチェックリスト", words: 2000, done: true }, { task: "文法プリント", display: "文法プリント（比較）", words: 700, done: true }] }] },
+      { week: "2026-W15", weekRange: "4/6〜4/12", tasks: { "VOA": { words: 1200, count: 1, done: true }, "Science News": { words: 0, count: 0, done: false }, "TED": { words: 0, count: 0, done: false }, "ESL Lab": { words: 200, count: 1, done: true }, "Elllo": { words: 0, count: 0, done: false }, "リスニング基礎トレ": { words: 0, count: 0, done: false }, "Quizlet（指定単語帳）": { words: 0, count: 0, done: false }, "Quizlet（英熟語 Target1000）": { words: 0, count: 0, done: false }, "Quizlet（多義語）": { words: 0, count: 0, done: false }, "Quizlet（基本動詞）": { words: 0, count: 0, done: false }, "Quizlet（語法）": { words: 0, count: 0, done: false }, "Quizlet（論理マーカー）": { words: 0, count: 0, done: false }, "シス単例文付きチェックリスト": { words: 2000, count: 1, done: true }, "文法プリント": { words: 700, count: 1, done: true } }, total: 4100, dailyLogs: [{ date: "2026-04-06", logs: [{ task: "VOA", display: "VOA", words: 1200, done: true }, { task: "Science News", display: "Science News", words: 0, done: false }, { task: "TED", display: "TED", words: 0, done: false }, { task: "ESL Lab", display: "ESL Lab", words: 200, done: true }, { task: "Elllo", display: "Elllo", words: 0, done: false }, { task: "リスニング基礎トレ", display: "リスニング基礎トレ", words: 0, done: false }, { task: "Quizlet（指定単語帳）", display: "Quizlet（指定単語帳）", words: 0, done: false }, { task: "Quizlet（英熟語 Target1000）", display: "Quizlet（英熟語 Target1000）", words: 0, done: false }, { task: "Quizlet（多義語）", display: "Quizlet（多義語）", words: 0, done: false }, { task: "Quizlet（基本動詞）", display: "Quizlet（基本動詞）", words: 0, done: false }, { task: "Quizlet（語法）", display: "Quizlet（語法）", words: 0, done: false }, { task: "Quizlet（論理マーカー）", display: "Quizlet（論理マーカー）", words: 0, done: false }, { task: "シス単例文付きチェックリスト", display: "シス単例文付きチェックリスト", words: 2000, done: true }, { task: "文法プリント", display: "文法プリント（比較）", words: 700, done: true }] }] },
+    ]
+  },
+};
+
+var GOAL_WORDS = 1000000;
+var GOAL_DATE  = '2027-01-15';
+var SCHOOL_NAME  = '個別教室のトライ 福井駅前本校';
+var TEACHER_NAME = '若林　卓生';
+var STUDENT_NAME = '山本唯菜';
+var TASK_COLORS = {
+  "VOA": "#3ecf8e",
+  "Science News": "#f7a44f",
+  "TED": "#f75f7a",
+  "ESL Lab": "#e879f9",
+  "Elllo": "#a78bfa",
+  "リスニング基礎トレ": "#fbbf24",
+  "Quizlet（指定単語帳）": "#34d399",
+  "Quizlet（英熟語 Target1000）": "#10b981",
+  "Quizlet（多義語）": "#059669",
+  "Quizlet（基本動詞）": "#047857",
+  "Quizlet（語法）": "#065f46",
+  "Quizlet（論理マーカー）": "#064e3b",
+  "シス単例文付きチェックリスト": "#4f8ef7",
+  "文法プリント": "#7c5cfc"
+};
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header>
+    <div class="top">
+      <div class="meta">
+        <div class="school" id="school-name"></div>
+        <div class="teacher" id="teacher-name"></div>
+      </div>
+      <div class="summary" id="summary">
+        <div class="goal-main" id="goal-main"></div>
+        <div class="goal-sub" id="goal-sub"></div>
+        <div style="height:8px;"></div>
+        <div class="progress-wrap" aria-hidden="true">
+          <div class="progress-bar" id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <div style="height:8px;"></div>
+        <div style="font-size:12px;color:var(--muted)">目標期限: <span id="goal-date"></span></div>
+      </div>
+    </div>
+
+    <div class="chart-card" style="margin-top:8px;">
+      <canvas id="stackedChart" height="160" style="width:100%;max-width:100%;"></canvas>
+    </div>
+  </header>
+
+  <main id="main-content" style="margin-top:12px;">
+    <!-- details per week will be injected here -->
+  </main>
+
+  <footer>
+    <div>生徒: <strong id="student-name"></strong> ・ 開始日: <span id="start-date"></span></div>
+  </footer>
+
+  <script>
+    (function(){
+      var student = STUDENT_DATA[STUDENT_NAME];
+      document.getElementById('school-name').textContent = SCHOOL_NAME;
+      document.getElementById('teacher-name').textContent = '担当講師: ' + TEACHER_NAME;
+      document.getElementById('student-name').textContent = STUDENT_NAME;
+      document.getElementById('start-date').textContent = student.startDate || '-';
+      document.getElementById('goal-date').textContent = GOAL_DATE;
+
+      // Goal and achievement display
+      var totalWords = student.totalWords || 0;
+      var ach = student.achievementRate || 0;
+      var achText = (typeof ach === 'number') ? ach.toFixed(2) + '%' : ach;
+      document.getElementById('goal-main').textContent = '目標: ' + GOAL_WORDS.toLocaleString() + ' 語  /  現在: ' + totalWords.toLocaleString() + ' 語 (' + achText + ')';
+      document.getElementById('goal-sub').textContent = '達成率は目標100%に対する現在の進捗を示します。';
+
+      // progress bar width (achievementRate is treated as percent value)
+      var progressBar = document.getElementById('progress-bar');
+      var widthPct = Math.min(100, Math.max(0, ach));
+      progressBar.style.width = widthPct + '%';
+      progressBar.setAttribute('aria-valuenow', widthPct);
+
+      // Prepare chart data
+      var records = student.records || [];
+      var labels = records.map(function(r){ return r.weekRange || r.week; });
+
+      // Determine task keys (preserve TASK_COLORS order, include extras)
+      var taskKeys = Object.keys(TASK_COLORS);
+      var extras = {};
+      records.forEach(function(r){
+        Object.keys(r.tasks || {}).forEach(function(k){
+          if(taskKeys.indexOf(k) === -1) extras[k] = true;
+        });
+      });
+      Object.keys(extras).forEach(function(k){ taskKeys.push(k); });
+
+      var datasets = taskKeys.map(function(task){
+        return {
+          label: task,
+          backgroundColor: TASK_COLORS[task] || '#888',
+          data: records.map(function(r){
+            var t = (r.tasks && r.tasks[task]) ? r.tasks[task].words : 0;
+            return t || 0;
+          }),
+          stack: 'stack1'
+        };
+      });
+
+      // Render Chart.js stacked bar
+      var ctx = document.getElementById('stackedChart').getContext('2d');
+      var stackedChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: labels, datasets: datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: 'rgba(232,236,244,0.9)', boxWidth:12, padding:8 } },
+            tooltip: {
+              callbacks: {
+                label: function(ctx){
+                  var v = ctx.raw || 0;
+                  return ctx.dataset.label + ': ' + v.toLocaleString() + ' 語';
+                }
+              }
+            }
+          },
+          scales: {
+            x: { stacked: true, ticks: { color: 'rgba(232,236,244,0.9)' }, grid: { display:false } },
+            y: { stacked: true, ticks: { color: 'rgba(232,236,244,0.9)', callback: function(v){ return v.toLocaleString(); } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+          }
+        }
+      });
+
+      // Render <details> per week (as required)
+      var main = document.getElementById('main-content');
+      records.forEach(function(rec, idx){
+        var d = document.createElement('details');
+        d.open = false;
+        var s = document.createElement('summary');
+
+        var left = document.createElement('div');
+        left.className = 'summary-left';
+        var wt = document.createElement('div');
+        wt.className = 'week-title';
+        wt.textContent = rec.week || '';
+        var wr = document.createElement('div');
+        wr.className = 'week-range';
+        wr.textContent = rec.weekRange || '';
+        left.appendChild(wt);
+        left.appendChild(wr);
+
+        var right = document.createElement('div');
+        right.className = 'week-total';
+        right.textContent = '週間合計: ' + (rec.total || 0).toLocaleString() + ' 語';
+
+        s.appendChild(left);
+        s.appendChild(right);
+        d.appendChild(s);
+
+        var content = document.createElement('div');
+        content.className = 'details-content';
+
+        // Weekly tasks summary (all tasks shown)
+        var taskWrap = document.createElement('div');
+        taskWrap.className = 'task-list';
+        var tasks = rec.tasks || {};
+        taskKeys.forEach(function(tk){
+          var tdata = tasks[tk] || { words:0, count:0, done:false };
+          var item = document.createElement('div');
+          item.className = 'task-item';
+          var nameWrap = document.createElement('div');
+          nameWrap.className = 'task-name';
+          var dot = document.createElement('span');
+          dot.className = 'task-dot';
+          dot.style.background = TASK_COLORS[tk] || '#666';
+          var name = document.createElement('span');
+          name.textContent = tk;
+          nameWrap.appendChild(dot);
+          nameWrap.appendChild(name);
+          var status = document.createElement('div');
+          if(tdata.done){
+            status.innerHTML = '<span class="task-done">✅ ' + (tdata.words || 0).toLocaleString() + ' 語</span>';
+          } else {
+            status.innerHTML = '<span class="task-not">➖ 未実施（0語）</span>';
+          }
+          item.appendChild(nameWrap);
+          item.appendChild(status);
+          taskWrap.appendChild(item);
+        });
+        content.appendChild(taskWrap);
+
+        // Daily logs
+        var dailyWrap = document.createElement('div');
+        dailyWrap.className = 'daily-list';
+        (rec.dailyLogs || []).forEach(function(day){
+          var dayBlock = document.createElement('div');
+          dayBlock.className = 'day-block';
+          var dayTitle = document.createElement('div');
+          dayTitle.className = 'day-title';
+          dayTitle.textContent = day.date;
+          dayBlock.appendChild(dayTitle);
+          var ul = document.createElement('ul');
+          ul.className = 'log';
+          (day.logs || []).forEach(function(l){
+            var li = document.createElement('li');
+            li.className = 'log-item';
+            if(l.done){
+              li.innerHTML = '<span class="done-strong">' + l.display + '</span>' + ' — ' + '<span class="done-strong">' + (l.words || 0).toLocaleString() + ' 語</span>';
+            } else {
+              li.innerHTML = '<span class="not-muted">' + l.display + ' — 未実施（0語）</span>';
+            }
+            ul.appendChild(li);
+          });
+          dayBlock.appendChild(ul);
+          dailyWrap.appendChild(dayBlock);
+        });
+        content.appendChild(dailyWrap);
+
+        d.appendChild(content);
+        main.appendChild(d);
+      });
+
+    })();
+  </script>
+</body>
+</html>
