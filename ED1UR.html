@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多読・多聴 進捗ダッシュボード - 中川花音</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f1117;
+            --card-bg: #1e2235;
+            --text-color: #e8ecf4;
+            --muted-text: #94a3b8;
+            --accent-color: #3ecf8e;
+            --border-color: #334155;
+            --progress-bg: #2d334a;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        /* ヘッダー */
+        header {
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+        }
+        .school-info { font-size: 0.9rem; color: var(--muted-text); }
+        .student-name { font-size: 2rem; font-weight: bold; margin: 5px 0; }
+        .period-info { font-size: 0.9rem; display: inline-block; background: var(--border-color); padding: 2px 10px; border-radius: 4px; }
+
+        /* サマリーカード */
+        .summary-card {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        }
+        .goal-text {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .goal-label { font-size: 0.9rem; color: var(--muted-text); display: block; }
+        .goal-main { font-size: 1.2rem; }
+        .highlight-words { font-size: 2.2rem; font-weight: 800; color: var(--accent-color); }
+        .achievement-rate { font-size: 1.8rem; font-weight: 800; color: #60a5fa; }
+
+        /* プログレスバー */
+        .progress-outer {
+            background: var(--progress-bg);
+            height: 24px;
+            border-radius: 12px;
+            overflow: hidden;
+            width: 100%;
+            border: 1px solid var(--border-color);
+        }
+        .progress-inner {
+            height: 100%;
+            background: linear-gradient(90deg, #3ecf8e, #3b82f6);
+            transition: width 1s ease-in-out;
+            border-radius: 12px;
+        }
+
+        /* グラフ */
+        .chart-container {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            height: 400px;
+        }
+
+        /* レコード（details/summary） */
+        details {
+            background: var(--card-bg);
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+        summary {
+            padding: 15px 20px;
+            cursor: pointer;
+            list-style: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.03);
+            transition: background 0.3s;
+        }
+        summary:hover { background: rgba(255, 255, 255, 0.08); }
+        summary::-webkit-details-marker { display: none; }
+        summary::after { content: '▼'; font-size: 0.8rem; color: var(--muted-text); }
+        details[open] summary::after { content: '▲'; }
+
+        .details-content { padding: 20px; border-top: 1px solid var(--border-color); background: rgba(0, 0, 0, 0.1); }
+        
+        h3 { font-size: 1rem; margin-bottom: 12px; color: var(--accent-color); border-left: 4px solid var(--accent-color); padding-left: 10px; }
+
+        /* タスクグリッド */
+        .task-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 8px;
+            margin-bottom: 25px;
+        }
+        .task-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px 15px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+        }
+        .task-item.not-done { opacity: 0.4; color: var(--muted-text); }
+        .status-icon { margin-right: 8px; }
+
+        /* 日別ログ */
+        .daily-log-card {
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 0;
+        }
+        .daily-log-card:last-child { border-bottom: none; }
+        .daily-date { font-weight: bold; margin-bottom: 10px; color: #fff; font-size: 0.95rem; }
+
+        @media (max-width: 600px) {
+            .highlight-words { font-size: 1.6rem; }
+            .achievement-rate { font-size: 1.4rem; }
+            .chart-container { height: 300px; }
+            .task-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="school-info" id="header-school"></div>
+        <div class="student-name" id="header-student"></div>
+        <div class="period-info" id="header-period"></div>
+    </header>
+
+    <section class="summary-card">
+        <div class="goal-text">
+            <div>
+                <span class="goal-label">目標：1,000,000 語</span>
+                <div class="goal-main">現在：<span class="highlight-words" id="total-words">0</span> 語</div>
+            </div>
+            <div style="text-align: right;">
+                <span class="goal-label">目標達成率</span>
+                <div class="achievement-rate" id="achievement-rate">0%</div>
+            </div>
+        </div>
+        <div class="progress-outer">
+            <div class="progress-inner" id="progress-bar" style="width: 0%"></div>
+        </div>
+    </section>
+
+    <div class="chart-container">
+        <canvas id="progressChart"></canvas>
+    </div>
+
+    <div id="records-container">
+        <!-- JSで動的に生成 -->
+    </div>
+</div>
+
+<script>
+// --- 埋め込みデータ開始 ---
+var STUDENT_DATA = {
+  "中川花音": {
+    startDate: "2026-04-03",
+    totalWords: 15700,
+    achievementRate: 1.57,
+    records: [
+      { week: "2026-W14", weekRange: "3/30〜4/5", tasks: { "VOA": { words: 2400, count: 2, done: true }, "Science News": { words: 0, count: 0, done: false }, "TED": { words: 0, count: 0, done: false }, "ESL Lab": { words: 400, count: 2, done: true }, "Elllo": { words: 0, count: 0, done: false }, "リスニング基礎トレ": { words: 0, count: 0, done: false }, "Quizlet（指定単語帳）": { words: 1400, count: 2, done: true }, "Quizlet（英熟語 Target1000）": { words: 0, count: 0, done: false }, "Quizlet（多義語）": { words: 0, count: 0, done: false }, "Quizlet（基本動詞）": { words: 0, count: 0, done: false }, "Quizlet（語法）": { words: 0, count: 0, done: false }, "Quizlet（論理マーカー）": { words: 0, count: 0, done: false }, "シス単例文付きチェックリスト": { words: 2000, count: 1, done: true }, "文法プリント": { words: 1400, count: 2, done: true } }, total: 7600, dailyLogs: [{ date: "2026-04-03", logs: [{ task: "VOA", display: "VOA", words: 1200, done: true }, { task: "Science News", display: "Science News", words: 0, done: false }, { task: "TED", display: "TED", words: 0, done: false }, { task: "ESL Lab", display: "ESL Lab", words: 200, done: true }, { task: "Elllo", display: "Elllo", words: 0, done: false }, { task: "リスニング基礎トレ", display: "リスニング基礎トレ", words: 0, done: false }, { task: "Quizlet（指定単語帳）", display: "Quizlet（指定単語帳）", words: 700, done: true }, { task: "Quizlet（英熟語 Target1000）", display: "Quizlet（英熟語 Target1000）", words: 0, done: false }, { task: "Quizlet（多義語）", display: "Quizlet（多義語）", words: 0, done: false }, { task: "Quizlet（基本動詞）", display: "Quizlet（基本動詞）", words: 0, done: false }, { task: "Quizlet（語法）", display: "Quizlet（語法）", words: 0, done: false }, { task: "Quizlet（論理マーカー）", display: "Quizlet（論理マーカー）", words: 0, done: false }, { task: "シス単例文付きチェックリスト", display: "シス単例文付きチェックリスト", words: 0, done: false }, { task: "文法プリント", display: "文法プリント（分詞）", words: 700, done: true }] }, { date: "2026-04-04", logs: [{ task: "VOA", display: "VOA", words: 1200, done: true }, { task: "Science News", display: "Science News", words: 0, done: false }, { task: "TED", display: "TED", words: 0, done: false }, { task: "ESL Lab", display: "ESL Lab", words: 200, done: true }, { task: "Elllo", display: "Elllo", words: 0, done: false }, { task: "リスニング基礎トレ", display: "リスニング基礎トレ", words: 0, done: false }, { task: "Quizlet（指定単語帳）", display: "Quizlet（指定単語帳）", words: 700, done: true }, { task: "Quizlet（英熟語 Target1000）", display: "Quizlet（英熟語 Target1000）", words: 0, done: false }, { task: "Quizlet（多義語）", display: "Quizlet（多義語）", words: 0, done: false }, { task: "Quizlet（基本動詞）", display: "Quizlet（基本動詞）", words: 0, done: false }, { task: "Quizlet（語法）", display: "Quizlet（語法）", words: 0, done: false }, { task: "Quizlet（論理マーカー）", display: "Quizlet（論理マーカー）", words: 0, done: false }, { task: "シス単例文付きチェックリスト", display: "シス単例文付きチェックリスト", words: 2000, done: true }, { task: "文法プリント", display: "文法プリント（比較）", words: 700, done: true }] }] },
+      { week: "2026-W15", weekRange: "4/6〜4/12", tasks: { "VOA": { words: 2400, count: 2, done: true }, "Science News": { words: 0, count: 0, done: false }, "TED": { words: 0, count: 0, done: false }, "ESL Lab": { words: 400, count: 2, done: true }, "Elllo": { words: 0, count: 0, done: false }, "リスニング基礎トレ": { words: 500, count: 1, done: true }, "Quizlet（指定単語帳）": { words: 1400, count: 2, done: true }, "Quizlet（英熟語 Target1000）": { words: 0, count: 0, done: false }, "Quizlet（多義語）": { words: 0, count: 0, done: false }, "Quizlet（基本動詞）": { words: 0, count: 0, done: false }, "Quizlet（語法）": { words: 0, count: 0, done: false }, "Quizlet（論理マーカー）": { words: 0, count: 0, done: false }, "シス単例文付きチェックリスト": { words: 2000, count: 1, done: true }, "文法プリント": { words: 1400, count: 2, done: true } }, total: 8100, dailyLogs: [{ date: "2026-04-06", logs: [{ task: "VOA", display: "VOA", words: 1200, done: true }, { task: "Science News", display: "Science News", words: 0, done: false }, { task: "TED", display: "TED", words: 0, done: false }, { task: "ESL Lab", display: "ESL Lab", words: 200, done: true }, { task: "Elllo", display: "Elllo", words: 0, done: false }, { task: "リスニング基礎トレ", display: "リスニング基礎トレ", words: 500, done: true }, { task: "Quizlet（指定単語帳）", display: "Quizlet（指定単語帳）", words: 700, done: true }, { task: "Quizlet（英熟語 Target1000）", display: "Quizlet（英熟語 Target1000）", words: 0, done: false }, { task: "Quizlet（多義語）", display: "Quizlet（多義語）", words: 0, done: false }, { task: "Quizlet（基本動詞）", display: "Quizlet（基本動詞）", words: 0, done: false }, { task: "Quizlet（語法）", display: "Quizlet（語法）", words: 0, done: false }, { task: "Quizlet（論理マーカー）", display: "Quizlet（論理マーカー）", words: 0, done: false }, { task: "シス単例文付きチェックリスト", display: "シス単例文付きチェックリスト", words: 2000, done: true }, { task: "文法プリント", display: "文法プリント（比較）", words: 700, done: true }] }, { date: "2026-04-09", logs: [{ task: "VOA", display: "VOA", words: 1200, done: true }, { task: "Science News", display: "Science News", words: 0, done: false }, { task: "TED", display: "TED", words: 0, done: false }, { task: "ESL Lab", display: "ESL Lab", words: 200, done: true }, { task: "Elllo", display: "Elllo", words: 0, done: false }, { task: "リスニング基礎トレ", display: "リスニング基礎トレ", words: 0, done: false }, { task: "Quizlet（指定単語帳）", display: "Quizlet（指定単語帳）", words: 700, done: true }, { task: "Quizlet（英熟語 Target1000）", display: "Quizlet（英熟語 Target1000）", words: 0, done: false }, { task: "Quizlet（多義語）", display: "Quizlet（多義語）", words: 0, done: false }, { task: "Quizlet（基本動詞）", display: "Quizlet（基本動詞）", words: 0, done: false }, { task: "Quizlet（語法）", display: "Quizlet（語法）", words: 0, done: false }, { task: "Quizlet（論理マーカー）", display: "Quizlet（論理マーカー）", words: 0, done: false }, { task: "シス単例文付きチェックリスト", display: "シス単例文付きチェックリスト", words: 0, done: false }, { task: "文法プリント", display: "文法プリント（仮定法）", words: 700, done: true }] }] },
+    ]
+  },
+};
+
+var GOAL_WORDS = 1000000;
+var GOAL_DATE  = '2027-01-15';
+var SCHOOL_NAME  = '個別教室のトライ 福井駅前本校';
+var TEACHER_NAME = '若林　卓生';
+var FILTER_START = '2026-03-30';
+var FILTER_END   = '2026-04-09';
+var STUDENT_NAME = '中川花音';
+var TASK_COLORS = {
+  "VOA": "#3ecf8e",
+  "Science News": "#f7a44f",
+  "TED": "#f75f7a",
+  "ESL Lab": "#e879f9",
+  "Elllo": "#a78bfa",
+  "リスニング基礎トレ": "#fbbf24",
+  "Quizlet（指定単語帳）": "#34d399",
+  "Quizlet（英熟語 Target1000）": "#10b981",
+  "Quizlet（多義語）": "#059669",
+  "Quizlet（基本動詞）": "#047857",
+  "Quizlet（語法）": "#065f46",
+  "Quizlet（論理マーカー）": "#064e3b",
+  "シス単例文付きチェックリスト": "#4f8ef7",
+  "文法プリント": "#7c5cfc"
+};
+// --- 埋め込みデータ終了 ---
+
+const student = STUDENT_DATA[STUDENT_NAME];
+
+// ヘッダー反映
+document.getElementById('header-school').textContent = SCHOOL_NAME;
+document.getElementById('header-student').textContent = STUDENT_NAME + ' 様';
+document.getElementById('header-period').textContent = `集計期間: ${FILTER_START} 〜 ${FILTER_END}`;
+
+// 目標達成率反映
+document.getElementById('total-words').textContent = student.totalWords.toLocaleString();
+document.getElementById('achievement-rate').textContent = student.achievementRate + '%';
+document.getElementById('progress-bar').style.width = student.achievementRate + '%';
+
+// グラフ作成 (Chart.js)
+const labels = student.records.map(r => r.weekRange);
+const datasets = Object.keys(TASK_COLORS).map(task => ({
+    label: task,
+    data: student.records.map(r => r.tasks[task] ? r.tasks[task].words : 0),
+    backgroundColor: TASK_COLORS[task],
+    stack: 'Stack 0'
+}));
+
+new Chart(document.getElementById('progressChart'), {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'bottom', labels: { color: '#e8ecf4', boxWidth: 10, font: { size: 10 } } }
+        },
+        scales: {
+            x: { stacked: true, grid: { color: '#334155' }, ticks: { color: '#e8ecf4' } },
+            y: { stacked: true, grid: { color: '#334155' }, ticks: { color: '#e8ecf4' } }
+        }
+    }
+});
+
+// レコード生成
+const container = document.getElementById('records-container');
+student.records.forEach(record => {
+    const details = document.createElement('details');
+    const summary = document.createElement('summary');
+    
+    summary.innerHTML = `
+        <span>${record.week} (${record.weekRange})</span>
+        <span style="color: var(--accent-color); margin-left: auto; margin-right: 15px;">週計: ${record.total.toLocaleString()} 語</span>
+    `;
+    details.appendChild(summary);
+
+    const content = document.createElement('div');
+    content.className = 'details-content';
+
+    // 1. 週間全課題サマリー
+    const h3Summary = document.createElement('h3');
+    h3Summary.textContent = '週間タスク集計（全課題）';
+    content.appendChild(h3Summary);
+
+    const summaryGrid = document.createElement('div');
+    summaryGrid.className = 'task-grid';
+    
+    Object.keys(TASK_COLORS).forEach(taskName => {
+        const taskData = record.tasks[taskName] || { words: 0, done: false };
+        const item = document.createElement('div');
+        item.className = `task-item ${!taskData.done ? 'not-done' : ''}`;
+        item.innerHTML = `
+            <span><span class="status-icon">${taskData.done ? '✅' : '➖'}</span>${taskName}</span>
+            <span style="font-weight: bold;">${taskData.words.toLocaleString()} 語</span>
+        `;
+        summaryGrid.appendChild(item);
+    });
+    content.appendChild(summaryGrid);
+
+    // 2. 日別詳細ログ
+    const h3Daily = document.createElement('h3');
+    h3Daily.textContent = '日別学習詳細';
+    content.appendChild(h3Daily);
+
+    record.dailyLogs.forEach(day => {
+        const dayCard = document.createElement('div');
+        dayCard.className = 'daily-log-card';
+        
+        const dateDiv = document.createElement('div');
+        dateDiv.className = 'daily-date';
+        dateDiv.textContent = day.date;
+        dayCard.appendChild(dateDiv);
+
+        const dailyGrid = document.createElement('div');
+        dailyGrid.className = 'task-grid';
+
+        day.logs.forEach(log => {
+            const logItem = document.createElement('div');
+            logItem.className = `task-item ${!log.done ? 'not-done' : ''}`;
+            logItem.innerHTML = `
+                <span><span class="status-icon">${log.done ? '✅' : '➖'}</span>${log.done ? (log.display || log.task) : log.task}</span>
+                <span style="font-weight: bold;">${log.words.toLocaleString()} 語</span>
+            `;
+            dailyGrid.appendChild(logItem);
+        });
+        
+        dayCard.appendChild(dailyGrid);
+        content.appendChild(dayCard);
+    });
+
+    details.appendChild(content);
+    container.appendChild(details);
+});
+</script>
+
+</body>
+</html>
