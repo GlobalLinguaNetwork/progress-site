@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多読・多聴 進捗ダッシュボード - 鹿田彩花</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f1117;
+            --card-bg: #1e2235;
+            --text-color: #e8ecf4;
+            --text-muted: #94a3b8;
+            --accent-color: #3ecf8e;
+            --border-color: #334155;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+        }
+
+        /* Header Styles */
+        header {
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 16px;
+        }
+
+        .school-name {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin: 0;
+        }
+
+        .student-title {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin: 8px 0;
+        }
+
+        .filter-period {
+            font-size: 0.85rem;
+            background: #2d3748;
+            padding: 4px 12px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        /* Stats Card */
+        .stats-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+
+        .goal-label {
+            color: var(--text-muted);
+            font-size: 1rem;
+            margin-bottom: 8px;
+        }
+
+        .achievement-primary {
+            font-size: 2rem;
+            font-weight: 800;
+            margin: 12px 0;
+            color: #fff;
+        }
+
+        .highlight-words {
+            color: var(--accent-color);
+            font-size: 2.5rem;
+        }
+
+        .achievement-rate-badge {
+            font-size: 1.4rem;
+            color: var(--accent-color);
+            margin-left: 10px;
+        }
+
+        .progress-container {
+            background: #334155;
+            height: 16px;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 16px 0;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #3ecf8e, #10b981);
+            transition: width 1s ease-in-out;
+        }
+
+        /* Chart */
+        .chart-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+            height: 350px;
+        }
+
+        /* Details & Summary */
+        details {
+            background: var(--card-bg);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        summary {
+            padding: 16px;
+            cursor: pointer;
+            list-style: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            background: #252a3d;
+            transition: background 0.2s;
+        }
+
+        summary:hover {
+            background: #2d344d;
+        }
+
+        .summary-left {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .summary-total {
+            color: var(--accent-color);
+            font-size: 1.2rem;
+        }
+
+        .details-content {
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .section-h {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            border-left: 4px solid var(--accent-color);
+            padding-left: 10px;
+        }
+
+        /* Task Grid */
+        .task-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .task-row {
+            padding: 10px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            background: rgba(255,255,255,0.03);
+        }
+
+        .task-row.done {
+            border-left: 3px solid var(--accent-color);
+        }
+
+        .task-row.not-done {
+            border-left: 3px solid #475569;
+            opacity: 0.5;
+            color: var(--text-muted);
+        }
+
+        .task-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Daily Logs */
+        .daily-log-card {
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .daily-date {
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        @media (max-width: 600px) {
+            .achievement-primary { font-size: 1.4rem; }
+            .highlight-words { font-size: 1.8rem; }
+            .task-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <p class="school-name" id="school-info"></p>
+        <h1 class="student-title" id="student-name-display"></h1>
+        <div class="filter-period" id="filter-period-display"></div>
+    </header>
+
+    <section class="stats-card">
+        <div class="goal-label">多読・多聴 目標達成状況</div>
+        <div class="achievement-primary">
+            目標: <span id="goal-words-display"></span> 語 / 
+            現在: <span class="highlight-words" id="total-words-display"></span> 語
+            <span class="achievement-rate-badge" id="rate-display"></span>
+        </div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar-inner"></div>
+        </div>
+    </section>
+
+    <div class="chart-card">
+        <canvas id="weeklyChart"></canvas>
+    </div>
+
+    <div id="records-list"></div>
+</div>
+
+<script>
+// --- 1. 埋め込みデータ (JavaScript) ---
+var STUDENT_DATA = {
+  "鹿田": {
+    startDate: "2026-04-04",
+    totalWords: 4800,
+    achievementRate: 0.48,
+    records: [
+      { week: "2026-W14", weekRange: "3/30〜4/5", tasks: { "VOA": { words: 1200, count: 1, done: true }, "Science News": { words: 0, count: 0, done: false }, "TED": { words: 0, count: 0, done: false }, "ESL Lab": { words: 200, count: 1, done: true }, "Elllo": { words: 0, count: 0, done: false }, "リスニング基礎トレ": { words: 0, count: 0, done: false }, "Quizlet（指定単語帳）": { words: 700, count: 1, done: true }, "Quizlet（英熟語 Target1000）": { words: 0, count: 0, done: false }, "Quizlet（多義語）": { words: 0, count: 0, done: false }, "Quizlet（基本動詞）": { words: 0, count: 0, done: false }, "Quizlet（語法）": { words: 0, count: 0, done: false }, "Quizlet（論理マーカー）": { words: 0, count: 0, done: false }, "シス単例文付きチェックリスト": { words: 2000, count: 1, done: true }, "文法プリント": { words: 700, count: 1, done: true } }, total: 4800, dailyLogs: [{ date: "2026-04-04", logs: [{ task: "VOA", display: "VOA", words: 1200, done: true }, { task: "Science News", display: "Science News", words: 0, done: false }, { task: "TED", display: "TED", words: 0, done: false }, { task: "ESL Lab", display: "ESL Lab", words: 200, done: true }, { task: "Elllo", display: "Elllo", words: 0, done: false }, { task: "リスニング基礎トレ", display: "リスニング基礎トレ", words: 0, done: false }, { task: "Quizlet（指定単語帳）", display: "Quizlet（指定単語帳）", words: 700, done: true }, { task: "Quizlet（英熟語 Target1000）", display: "Quizlet（英熟語 Target1000）", words: 0, done: false }, { task: "Quizlet（多義語）", display: "Quizlet（多義語）", words: 0, done: false }, { task: "Quizlet（基本動詞）", display: "Quizlet（基本動詞）", words: 0, done: false }, { task: "Quizlet（語法）", display: "Quizlet（語法）", words: 0, done: false }, { task: "Quizlet（論理マーカー）", display: "Quizlet（論理マーカー）", words: 0, done: false }, { task: "シス単例文付きチェックリスト", display: "シス単例文付きチェックリスト", words: 2000, done: true }, { task: "文法プリント", display: "文法プリント（時制）", words: 700, done: true }] }] },
+    ]
+  },
+};
+
+var GOAL_WORDS = 1000000;
+var GOAL_DATE  = '2027-01-15';
+var SCHOOL_NAME  = '個別教室のトライ 福井駅前本校';
+var TEACHER_NAME = '若林　卓生';
+var FILTER_START = '2026-03-30';
+var FILTER_END   = '2026-04-10';
+var STUDENT_NAME = '鹿田彩花';
+var TASK_COLORS = {
+  "VOA": "#3ecf8e",
+  "Science News": "#f7a44f",
+  "TED": "#f75f7a",
+  "ESL Lab": "#e879f9",
+  "Elllo": "#a78bfa",
+  "リスニング基礎トレ": "#fbbf24",
+  "Quizlet（指定単語帳）": "#34d399",
+  "Quizlet（英熟語 Target1000）": "#10b981",
+  "Quizlet（多義語）": "#059669",
+  "Quizlet（基本動詞）": "#047857",
+  "Quizlet（語法）": "#065f46",
+  "Quizlet（論理マーカー）": "#064e3b",
+  "シス単例文付きチェックリスト": "#4f8ef7",
+  "文法プリント": "#7c5cfc"
+};
+
+// --- Initialization ---
+document.addEventListener('DOMContentLoaded', function() {
+    const sData = STUDENT_DATA["鹿田"];
+
+    // Header info
+    document.getElementById('school-info').textContent = `${SCHOOL_NAME} / 担当: ${TEACHER_NAME}`;
+    document.getElementById('student-name-display').textContent = STUDENT_NAME;
+    document.getElementById('filter-period-display').textContent = `集計期間: ${FILTER_START} 〜 ${FILTER_END}`;
+
+    // Goals & Achievement
+    document.getElementById('goal-words-display').textContent = GOAL_WORDS.toLocaleString();
+    document.getElementById('total-words-display').textContent = sData.totalWords.toLocaleString();
+    document.getElementById('rate-display').textContent = `(${sData.achievementRate}%)`;
+    document.getElementById('progress-bar-inner').style.width = Math.min(sData.achievementRate, 100) + '%';
+
+    // Chart.js Stacked Bar
+    const ctx = document.getElementById('weeklyChart').getContext('2d');
+    const taskKeys = Object.keys(TASK_COLORS);
+    
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: sData.records.map(r => r.weekRange),
+            datasets: taskKeys.map(taskName => ({
+                label: taskName,
+                data: sData.records.map(r => r.tasks[taskName] ? r.tasks[taskName].words : 0),
+                backgroundColor: TASK_COLORS[taskName],
+                borderRadius: 4
+            }))
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { mode: 'index', intersect: false }
+            },
+            scales: {
+                x: { stacked: true, grid: { display: false }, ticks: { color: '#94a3b8' } },
+                y: { stacked: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
+            }
+        }
+    });
+
+    // Render Records (Details/Summary)
+    const recordsList = document.getElementById('records-list');
+    
+    sData.records.forEach(record => {
+        const details = document.createElement('details');
+        
+        const summary = document.createElement('summary');
+        summary.innerHTML = `
+            <div class="summary-left">
+                <span>${record.week}</span>
+                <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">${record.weekRange}</span>
+            </div>
+            <div class="summary-total">${record.total.toLocaleString()} 語</div>
+        `;
+        
+        const content = document.createElement('div');
+        content.className = 'details-content';
+
+        // 1. Weekly Task Summary
+        let weeklySummaryHTML = `<div class="section-h">週間課題サマリー</div><div class="task-grid">`;
+        Object.entries(record.tasks).forEach(([name, data]) => {
+            weeklySummaryHTML += `
+                <div class="task-row ${data.done ? 'done' : 'not-done'}">
+                    <div class="task-info">
+                        <span>${data.done ? '✅' : '➖'}</span>
+                        <span>${name}</span>
+                    </div>
+                    <span>${data.words.toLocaleString()} 語</span>
+                </div>
+            `;
+        });
+        weeklySummaryHTML += `</div>`;
+
+        // 2. Daily Logs
+        let dailyLogsHTML = `<div class="section-h">日別詳細ログ</div>`;
+        record.dailyLogs.forEach(day => {
+            const dayTotal = day.logs.reduce((acc, l) => acc + l.words, 0);
+            dailyLogsHTML += `
+                <div class="daily-log-card">
+                    <div class="daily-date">
+                        <span>${day.date}</span>
+                        <span style="color:var(--accent-color)">${dayTotal.toLocaleString()} 語</span>
+                    </div>
+                    <div class="task-grid">
+            `;
+            day.logs.forEach(log => {
+                dailyLogsHTML += `
+                    <div class="task-row ${log.done ? 'done' : 'not-done'}">
+                        <div class="task-info">
+                            <span>${log.done ? '✅' : '➖'}</span>
+                            <span>${log.done ? log.display : log.task}</span>
+                        </div>
+                        <span>${log.done ? log.words.toLocaleString() + ' 語' : '未実施'}</span>
+                    </div>
+                `;
+            });
+            dailyLogsHTML += `</div></div>`;
+        });
+
+        content.innerHTML = weeklySummaryHTML + dailyLogsHTML;
+        details.appendChild(summary);
+        details.appendChild(content);
+        recordsList.appendChild(details);
+    });
+});
+</script>
+
+</body>
+</html>
